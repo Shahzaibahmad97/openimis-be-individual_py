@@ -9,6 +9,7 @@ from django.db.models import Q, OuterRef, Subquery
 from core.custom_filters import CustomFilterWizardStorage
 from core.gql.export_mixin import ExportableQueryMixin
 from core.schema import OrderedDjangoFilterConnectionField
+from core.services import wait_for_mutation
 from core.utils import append_validity_filter, is_valid_uuid
 from individual.apps import IndividualConfig
 from individual.gql_mutations import CreateIndividualMutation, UpdateIndividualMutation, DeleteIndividualMutation, \
@@ -53,7 +54,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
     module_name = "individual"
     object_type = "Individual"
     object_type_group = "Group"
-    related_field_individual = "groupindividual__individual"
+    related_field_individual = "groupindividuals__individual"
 
     individual = OrderedDjangoFilterConnectionField(
         IndividualGQLType,
@@ -104,9 +105,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         applyDefaultValidityFilter=graphene.Boolean(),
         client_mutation_id=graphene.String(),
         first_name=graphene.String(),
-        last_name=graphene.String(),
-        customFilters=graphene.List(of_type=graphene.String),
-        benefitPlanToEnroll=graphene.String()
+
     )
 
     group_history = OrderedDjangoFilterConnectionField(
@@ -156,15 +155,19 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
     global_schema = graphene.Field(GlobalSchemaType)
 
     def resolve_individual(self, info, **kwargs):
+        Query._check_permissions(info.context.user,
+                                 IndividualConfig.gql_individual_search_perms)
+
         filters = append_validity_filter(**kwargs)
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         group_id = kwargs.get("groupId")
         if group_id:
-            filters.append(Q(groupindividual__group__id=group_id))
+            filters.append(Q(groupindividuals__group__id=group_id))
 
         benefit_plan_to_enroll = kwargs.get("benefitPlanToEnroll")
         if benefit_plan_to_enroll:
@@ -185,9 +188,9 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             subquery = GroupIndividual.objects.filter(individual=OuterRef('pk')).values('individual')
             filters.append(~Q(pk__in=Subquery(subquery)))
 
-        Query._check_permissions(info.context.user,
-                                 IndividualConfig.gql_individual_search_perms)
-        query = Individual.objects.filter(*filters)
+        query = IndividualGQLType.get_queryset(None, info)
+        query = query.filter(*filters)
+
         custom_filters = kwargs.get("customFilters", None)
         if custom_filters:
             query = CustomFilterWizardStorage.build_custom_filters_queryset(
@@ -244,6 +247,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         Query._check_permissions(info.context.user,
@@ -256,6 +260,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         Query._check_permissions(info.context.user,
@@ -268,6 +273,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         Query._check_permissions(info.context.user,
@@ -280,6 +286,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         Query._check_permissions(info.context.user,
@@ -295,15 +302,16 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         filters = append_validity_filter(**kwargs)
         client_mutation_id = kwargs.get("client_mutation_id", None)
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         first_name = kwargs.get("first_name", None)
         if first_name:
-            filters.append(Q(groupindividual__individual__first_name__icontains=first_name))
+            filters.append(Q(groupindividuals__individual__first_name__icontains=first_name))
 
         last_name = kwargs.get("last_name", None)
         if last_name:
-            filters.append(Q(groupindividual__individual__last_name__icontains=last_name))
+            filters.append(Q(groupindividuals__individual__last_name__icontains=last_name))
 
         benefit_plan_to_enroll = kwargs.get("benefitPlanToEnroll")
         if benefit_plan_to_enroll:
@@ -312,7 +320,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                 ~Q(groupbeneficiary__benefit_plan_id=benefit_plan_to_enroll)
             )
 
-        query = Group.objects.filter(*filters).distinct()
+        query = GroupGQLType.get_queryset(None, info)
+        query = query.filter(*filters).distinct()
 
         custom_filters = kwargs.get("customFilters", None)
         if custom_filters:
@@ -329,6 +338,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id")
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         json_ext_head_icontains = kwargs.get("json_ext_head__icontains")
@@ -354,6 +364,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id", None)
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         query = GroupIndividual.objects.filter(*filters)
@@ -371,6 +382,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         client_mutation_id = kwargs.get("client_mutation_id", None)
         if client_mutation_id:
+            wait_for_mutation(client_mutation_id)
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         Query._check_permissions(
