@@ -12,7 +12,7 @@ from individual.tests.data import (
     service_add_individual_payload
 )
 from location.test_helpers import create_test_village, assign_user_districts
-from core.models.openimis_graphql_test_case import openIMISGraphQLTestCase
+from core.models.openimis_graphql_test_case import openIMISGraphQLTestCase, BaseTestContext
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from tasks_management.models import Task
@@ -62,9 +62,6 @@ def create_group_with_individual(username, group_override={}, individual_overrid
     return individual, group, group_individual
 
 
-class BaseTestContext:
-    def __init__(self, user):
-        self.user = user
 
 
 # Create a role with permissions to CRUD individuals and groups
@@ -114,7 +111,7 @@ class IndividualGQLTestCase(openIMISGraphQLTestCase):
         super().setUpClass()
 
         cls.admin_user = create_test_interactive_user(username="adminSeesEveryone")
-        cls.admin_token = get_token(cls.admin_user, BaseTestContext(user=cls.admin_user))
+        cls.admin_token = BaseTestContext(user=cls.admin_user).get_jwt()
 
         cls.village_a = create_test_village({
             'name': 'Village A',
@@ -132,13 +129,13 @@ class IndividualGQLTestCase(openIMISGraphQLTestCase):
             username="districtAUser", roles=[cls.sp_role.id])
         district_a_code = cls.village_a.parent.parent.code
         assign_user_districts(cls.dist_a_user, ["R1D1", district_a_code])
-        cls.dist_a_user_token = get_token(cls.dist_a_user, BaseTestContext(user=cls.dist_a_user))
+        cls.dist_a_user_token = BaseTestContext(user=cls.dist_a_user).get_jwt()
 
         cls.dist_b_user = create_test_interactive_user(
             username="districtBUser", roles=[cls.sp_role.id])
         district_b_code = cls.village_b.parent.parent.code
         assign_user_districts(cls.dist_b_user, [district_b_code])
-        cls.dist_b_user_token = get_token(cls.dist_b_user, BaseTestContext(user=cls.dist_b_user))
+        cls.dist_b_user_token = BaseTestContext(user=cls.dist_b_user).get_jwt()
 
         cls.med_enroll_officer = create_test_interactive_user(
             username="medEONoRight", roles=[1]) # 1 is the med enrollment officer role
